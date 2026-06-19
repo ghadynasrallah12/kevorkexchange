@@ -274,13 +274,34 @@ const firebaseConfig = {
 
 // Firebase SDK version (bump this if the import ever fails to load).
 const SDK = "10.12.0";
+const RATE_CACHE_KEY = "kevoExchangeLastRate";
 
 /* ---------- shared state ---------- */
-let rate = 14500;            // SYP per 1 USD
-let updatedAt = Date.now();  // ms
+const cachedRate = loadCachedRate();
+let rate = cachedRate?.rate || 14500;                // SYP per 1 USD
+let updatedAt = cachedRate?.updatedAt || Date.now(); // ms
 let mode = "demo";           // "demo" | "live"
 let activeField = null;      // "usd" | "syp"
 let live = null;             // filled in live mode: { setRate, signIn, signOut }
+
+function loadCachedRate(){
+  try{
+    const saved = JSON.parse(localStorage.getItem(RATE_CACHE_KEY) || "null");
+    if (saved && typeof saved.rate === "number" && saved.rate > 0){
+      return {
+        rate: saved.rate,
+        updatedAt: typeof saved.updatedAt === "number" ? saved.updatedAt : Date.now()
+      };
+    }
+  }catch(e){}
+  return null;
+}
+
+function cacheRate(){
+  try{
+    localStorage.setItem(RATE_CACHE_KEY, JSON.stringify({ rate, updatedAt }));
+  }catch(e){}
+}
 
 /* ---------- elements ---------- */
 const $ = (id) => document.getElementById(id);
@@ -322,6 +343,7 @@ function renderRate(animate){
   rateMain.innerHTML = nf0.format(Math.round(rate)) + '<span class="unit">SYP</span>';
   rateInv.textContent = fmtInverse(rate);
   if ($("curRate")) $("curRate").textContent = nf0.format(Math.round(rate));
+  cacheRate();
   // keep the converter in sync with the new rate
   if (activeField === "usd") recompute("usd");
   else if (activeField === "syp") recompute("syp");
