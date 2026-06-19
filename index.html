@@ -382,18 +382,25 @@ function adminPath(){
   return location.pathname.replace(/\/$/, "").endsWith("/admin");
 }
 
+function adminQuery(){
+  return new URLSearchParams(location.search).get("admin") === "1";
+}
+
 function shouldShowAdmin(){
   if (sessionStorage.getItem(ADMIN_SESSION_KEY) === "1"){
     sessionStorage.removeItem(ADMIN_SESSION_KEY);
     return true;
   }
-  return adminPath() || location.hash === "#admin";
+  return adminPath() || adminQuery() || location.hash === "#admin";
 }
+
+let adminMode = false;
 
 function route(){
   const isAdmin = shouldShowAdmin();
+  adminMode = isAdmin;
   document.body.classList.toggle("admin-mode", isAdmin);
-  if (isAdmin && !adminPath() && history.replaceState){
+  if (isAdmin && history.replaceState){
     history.replaceState(null, "", "admin/");
   }
 }
@@ -426,6 +433,7 @@ $("loginBtn").addEventListener("click", async () => {
   loginMsg.className = "msg";
   const email = $("email").value.trim(), pass = $("pass").value;
   if (!email || !pass){ loginMsg.className = "msg err"; loginMsg.textContent = "Enter your email and password."; return; }
+  if (mode !== "live" || !live){ loginMsg.className = "msg err"; loginMsg.textContent = "Admin login needs a live connection. Refresh and try again."; return; }
   $("loginBtn").disabled = true;
   try{
     await live.signIn(email, pass);   // onAuthStateChanged will reveal the editor
@@ -453,6 +461,11 @@ async function boot(){
       const db = dbMod.getDatabase(app);
       const auth = authMod.getAuth(app);
       mode = "live";
+
+      if (adminMode){
+        await authMod.setPersistence(auth, authMod.inMemoryPersistence);
+        await authMod.signOut(auth);
+      }
 
       // read the rate in real time — pushes to every open page instantly
       dbMod.onValue(dbMod.ref(db, "rate"), (snap) => {
@@ -482,8 +495,15 @@ async function boot(){
     }
   }
 
-  // demo mode has no login step — open the editor directly
-  if (mode === "demo"){ showEditor(); editorSub.textContent = "Demo — changes stay on this device only."; }
+  // Demo mode is public-only; admin changes require Firebase auth.
+  if (mode === "demo" && adminMode){
+    showLogin();
+    loginMsg.className = "msg err";
+    loginMsg.textContent = "Admin login needs a live connection. Refresh and try again.";
+  } else if (mode === "demo"){
+    showEditor();
+    editorSub.textContent = "Demo — changes stay on this device only.";
+  }
 
   renderStatus();
   renderRate(false);
