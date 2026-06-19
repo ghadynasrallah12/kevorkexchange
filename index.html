@@ -215,7 +215,6 @@
 
     <div class="foot">
       <span class="updated" id="updated"></span>
-      <a class="manage" href="#admin">Manage rate</a>
     </div>
 
     <div class="demo-note" id="demoNote" style="display:none">
@@ -236,7 +235,7 @@
       <input type="password" id="pass" autocomplete="current-password" placeholder="••••••••" />
       <button class="btn" id="loginBtn">Sign in</button>
       <div class="msg" id="loginMsg"></div>
-      <a class="back" href="#">← Back to rate</a>
+      <a class="back" href="../">← Back to rate</a>
     </div>
 
     <!-- editor -->
@@ -251,7 +250,7 @@
       <button class="btn" id="saveBtn">Save rate</button>
       <button class="btn btn-ghost" id="signoutBtn">Sign out</button>
       <div class="msg" id="saveMsg"></div>
-      <a class="back" href="#">← Back to rate</a>
+      <a class="back" href="../">← Back to rate</a>
     </div>
   </div>
 
@@ -355,8 +354,26 @@ usdIn.addEventListener("focus", () => activeField = "usd");
 sypIn.addEventListener("focus", () => activeField = "syp");
 
 /* ---------- admin: routing ---------- */
+const ADMIN_SESSION_KEY = "openRateAdmin";
+
+function adminPath(){
+  return location.pathname.replace(/\/$/, "").endsWith("/admin");
+}
+
+function shouldShowAdmin(){
+  if (sessionStorage.getItem(ADMIN_SESSION_KEY) === "1"){
+    sessionStorage.removeItem(ADMIN_SESSION_KEY);
+    return true;
+  }
+  return adminPath() || location.hash === "#admin";
+}
+
 function route(){
-  document.body.classList.toggle("admin-mode", location.hash === "#admin");
+  const isAdmin = shouldShowAdmin();
+  document.body.classList.toggle("admin-mode", isAdmin);
+  if (isAdmin && !adminPath() && history.replaceState){
+    history.replaceState(null, "", "admin/");
+  }
 }
 window.addEventListener("hashchange", route);
 route();
