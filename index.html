@@ -410,9 +410,25 @@ route();
 /* ---------- admin: editor wiring ---------- */
 const loginView = $("loginView"), editorView = $("editorView");
 const editorSub = $("editorSub"), saveMsg = $("saveMsg"), loginMsg = $("loginMsg");
+const loginBtn = $("loginBtn");
 
 function showEditor(){ loginView.style.display = "none"; editorView.style.display = "block"; if($("curRate")) $("curRate").textContent = nf0.format(Math.round(rate)); }
-function showLogin(){ editorView.style.display = "none"; loginView.style.display = "block"; }
+function setLoginLoading(){
+  loginBtn.disabled = true;
+  loginMsg.className = "msg";
+  loginMsg.textContent = "Loading secure login...";
+}
+function setLoginReady(){
+  loginBtn.disabled = false;
+  if (loginMsg.textContent === "Loading secure login...") loginMsg.textContent = "";
+}
+function showLogin(){
+  editorView.style.display = "none";
+  loginView.style.display = "block";
+  if (adminMode && !live) setLoginLoading();
+  else if (adminMode) setLoginReady();
+}
+if (adminMode) setLoginLoading();
 
 $("saveBtn").addEventListener("click", async () => {
   const v = parseNum($("newRate").value);
@@ -433,13 +449,13 @@ $("loginBtn").addEventListener("click", async () => {
   loginMsg.className = "msg";
   const email = $("email").value.trim(), pass = $("pass").value;
   if (!email || !pass){ loginMsg.className = "msg err"; loginMsg.textContent = "Enter your email and password."; return; }
-  if (mode !== "live" || !live){ loginMsg.className = "msg err"; loginMsg.textContent = "Admin login needs a live connection. Refresh and try again."; return; }
-  $("loginBtn").disabled = true;
+  if (mode !== "live" || !live){ setLoginLoading(); return; }
+  loginBtn.disabled = true;
   try{
     await live.signIn(email, pass);   // onAuthStateChanged will reveal the editor
   }catch(e){
     loginMsg.className = "msg err"; loginMsg.textContent = "Wrong email or password.";
-  }finally{ $("loginBtn").disabled = false; }
+  }finally{ loginBtn.disabled = false; }
 });
 
 $("signoutBtn").addEventListener("click", async () => {
@@ -477,6 +493,13 @@ async function boot(){
         }
       });
 
+      live = {
+        setRate: (v) => dbMod.set(dbMod.ref(db, "rate"), { value: v, updatedAt: dbMod.serverTimestamp() }),
+        signIn: (e, p) => authMod.signInWithEmailAndPassword(auth, e, p),
+        signOut: () => authMod.signOut(auth)
+      };
+      if (adminMode) setLoginReady();
+
       // reveal editor only when signed in
       authMod.onAuthStateChanged(auth, (user) => {
         editorSub.textContent = user
@@ -484,12 +507,6 @@ async function boot(){
           : "Set how many Syrian Pounds equal one US Dollar.";
         if (user) showEditor(); else showLogin();
       });
-
-      live = {
-        setRate: (v) => dbMod.set(dbMod.ref(db, "rate"), { value: v, updatedAt: dbMod.serverTimestamp() }),
-        signIn: (e, p) => authMod.signInWithEmailAndPassword(auth, e, p),
-        signOut: () => authMod.signOut(auth)
-      };
     }catch(err){
       mode = "demo"; // CDN unreachable → stay usable
     }
